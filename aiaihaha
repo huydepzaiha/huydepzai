@@ -2,11 +2,13 @@
 -- EXECUTOR MENU - Fix NoClip Không Lỗi Thảm & Xuyên Tường Mượt 100%
 -- (Banana Cat Hub Style + Caro Pattern + Chỉnh kích thước 4 góc + Chỉnh Rộng/Dày/Dài Thảm Kính)
 -- + ESP: Phân biệt Bạn Bè (Hồng/Tím) & Hạ ngục/Chết + Đếm giờ Hạ Ngục
--- + Định Vị Lẻ (Đã chuyển sang Tab Người Chơi): Bật tính năng -> Nhấn tên người chơi -> Chỉ định vị 1 người đó
+-- + Định Vị Lẻ: Bật tính năng -> Nhấn tên người chơi -> Chỉ định vị 1 người đó
 -- + Tab Tọa Độ: Lưu, Đặt tên, ESP All/Lẻ, Xóa, Bay tới Tọa Độ
 -- + Tab Niệm Tâm: Vòng tròn + Tự động ESP Tên/Máu người trong vòng + Nút bấm Bật/Tắt Niệm Tâm (Aimbot)
 -- StarterGui -> LocalScript hoặc Executor
 -- ============================================
+
+print("🍌 Banana Cat Hub: Đang khởi tạo...")
 
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
@@ -20,14 +22,12 @@ local VirtualUser = game:GetService("VirtualUser")
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
--- Xác định Parent an toàn cho UI
+-- Xác định Parent an toàn cho UI (Dự phòng nếu CoreGui bị khóa)
 local targetGui = playerGui
 pcall(function()
     if gethui then
         local hui = gethui()
         if hui then targetGui = hui end
-    elseif game:GetService("CoreGui") then
-        targetGui = game:GetService("CoreGui")
     end
 end)
 
@@ -98,7 +98,7 @@ local function TweenL(p)
     Tween(Lighting, p)
 end
 
--- ==================== SCREEN GUI ====================
+-- ==================== SCREEN GUI (An toàn tuyệt đối) ====================
 if targetGui:FindFirstChild("ExMenu") then
     targetGui.ExMenu:Destroy()
 end
@@ -108,7 +108,16 @@ local gui = New("ScreenGui", {
     IgnoreGuiInset=true,
     ResetOnSpawn=false,
     ZIndexBehavior=Enum.ZIndexBehavior.Sibling,
-}, targetGui)
+})
+
+-- Thử gắn vào targetGui, nếu lỗi (bảo mật) thì lùi lại gắn vào CoreGui hoặc PlayerGui
+local okParent = pcall(function() gui.Parent = targetGui end)
+if not okParent then
+    local okCG = pcall(function() gui.Parent = game:GetService("CoreGui") end)
+    if not okCG then
+        gui.Parent = playerGui
+    end
+end
 
 -- Toggle Button
 local togBtn = New("TextButton", {
@@ -501,18 +510,20 @@ end))
 
 -- ==================== CHẶN SERVER TÁC ĐỘNG BẢO VỆ BẢN THÂN ====================
 local oldNamecall
-if hookmetamethod then
-    oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
-        local method = getnamecallmethod()
-        if S.blockServer and self == player then
-            if method == "Kick" or method == "kick" then
-                warn("[Banana Cat Hub] Đã chặn thành công lệnh Kick từ Máy chủ!")
-                return nil
+pcall(function()
+    if hookmetamethod then
+        oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
+            local method = getnamecallmethod()
+            if S.blockServer and self == player then
+                if method == "Kick" or method == "kick" then
+                    warn("[Banana Cat Hub] Đã chặn thành công lệnh Kick từ Máy chủ!")
+                    return nil
+                end
             end
-        end
-        return oldNamecall(self, ...)
-    end)
-end
+            return oldNamecall(self, ...)
+        end)
+    end
+end)
 
 -- ==================== VÒNG LẶP STEPPED: FREEZE OTHERS & ANTI-SERVER ====================
 trackConn(RunService.Stepped:Connect(function()
@@ -1013,7 +1024,14 @@ local espGui = New("ScreenGui", {
     Name = "ExMenu_ESP",
     ResetOnSpawn = false,
     ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
-}, targetGui)
+})
+local okEsp1 = pcall(function() espGui.Parent = targetGui end)
+if not okEsp1 then
+    local okEsp2 = pcall(function() espGui.Parent = game:GetService("CoreGui") end)
+    if not okEsp2 then
+        espGui.Parent = playerGui
+    end
+end
 
 local activeESPs = {}
 
@@ -1918,12 +1936,14 @@ serverHopBtn.Activated:Connect(function()
     local servers = {}
     local req = request or http_request or (syn and syn.request)
     if req then
-        local res = req({Url = string.format("https://games.roblox.com/v1/games/%d/servers/0?sortOrder=Desc&limit=100", game.PlaceId)})
-        local body = HttpService:JSONDecode(res.Body)
-        if body and body.data then
-            for _, s in ipairs(body.data) do
-                if type(s) == "table" and s.playing < s.maxPlayers and s.id ~= game.JobId then
-                    table.insert(servers, s.id)
+        local ok, res = pcall(req, {Url = string.format("https://games.roblox.com/v1/games/%d/servers/0?sortOrder=Desc&limit=100", game.PlaceId)})
+        if ok and res and res.Body then
+            local body = HttpService:JSONDecode(res.Body)
+            if body and body.data then
+                for _, s in ipairs(body.data) do
+                    if type(s) == "table" and s.playing < s.maxPlayers and s.id ~= game.JobId then
+                        table.insert(servers, s.id)
+                    end
                 end
             end
         end
@@ -2647,4 +2667,4 @@ end))
 UpdChar()
 if S.noClip then EnNC() end
 
-print("✅ Đã cập nhật: Lỗi UI đã được sửa, Định Vị Lẻ hoạt động tốt ở Tab Người Chơi!")
+print("✅ Banana Cat Hub: Khởi tạo hoàn tất! Nhấn Ctrl phải hoặc nút 🍌 để mở menu.")
