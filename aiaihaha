@@ -44,7 +44,6 @@ local function trackConn(conn)
     return conn
 end
 
--- Unbind các RenderStep cũ để tránh trùng lặp gây lỗi
 pcall(function() RunService:UnbindFromRenderStep("Fly") end)
 pcall(function() RunService:UnbindFromRenderStep("Carpet") end)
 
@@ -1906,6 +1905,37 @@ RebuildTPList()
 -- ==================== TAB 5: NGƯỜI CHƠI ====================
 local py = 8
 
+Label(playerTab, "🔄 Chuyển máy chủ", py)
+py = py + 14
+local rejoinBtn = Button(playerTab, "🔄 Vào Lại Server", 8, py, 110, 24, C.BLUE)
+local serverHopBtn = Button(playerTab, "🌐 Đổi Server Khác", 126, py, 110, 24, C.PURPLE)
+
+rejoinBtn.Activated:Connect(function()
+    TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, player)
+end)
+
+serverHopBtn.Activated:Connect(function()
+    local servers = {}
+    local req = request or http_request or (syn and syn.request)
+    if req then
+        local res = req({Url = string.format("https://games.roblox.com/v1/games/%d/servers/0?sortOrder=Desc&limit=100", game.PlaceId)})
+        local body = HttpService:JSONDecode(res.Body)
+        if body and body.data then
+            for _, s in ipairs(body.data) do
+                if type(s) == "table" and s.playing < s.maxPlayers and s.id ~= game.JobId then
+                    table.insert(servers, s.id)
+                end
+            end
+        end
+    end
+    if #servers > 0 then
+        TeleportService:TeleportToPlaceInstance(game.PlaceId, servers[math.random(1, #servers)], player)
+    else
+        TeleportService:Teleport(game.PlaceId, player)
+    end
+end)
+py = py + 30
+
 Label(playerTab, "🧊 Tác Động Khác", py)
 py = py + 14
 
@@ -1969,26 +1999,24 @@ py = py + 32
 Label(playerTab, "👤 Danh sách (Nhấn tên để chọn định vị)", py)
 py = py + 14
 
-local soloList = New("ScrollingFrame", {
-    Size=UDim2.new(1,-16,1,-py-10), Position=UDim2.new(0,8,0,py),
-    BackgroundTransparency=1, BorderSizePixel=0, ScrollBarThickness=5,
-    CanvasSize=UDim2.new(0,0,0,0), ZIndex=6,
-}, playerTab)
-New("UIListLayout", {SortOrder=Enum.SortOrder.LayoutOrder, Padding=UDim.new(0,6)}, soloList)
+local soloListStartY = py
 
 RebuildSoloList = function()
-    for _,c in ipairs(soloList:GetChildren()) do
-        if not c:IsA("UIListLayout") then c:Destroy() end
+    -- Xóa các hàng cũ
+    for _,c in ipairs(playerTab:GetChildren()) do
+        if c.Name == "SoloRow" then c:Destroy() end
     end
 
     local term = searchSoloIn.Text:lower()
-    local totalHeight = 0
+    local currentY = soloListStartY
     for _, p in ipairs(Players:GetPlayers()) do
         if p ~= player and (term == "" or p.Name:lower():find(term, 1, true)) then
             local row = New("Frame", {
-                Size=UDim2.new(1,0,0,34), BackgroundColor3=Color3.fromRGB(255,255,255),
+                Name = "SoloRow",
+                Size=UDim2.new(1,-16,0,34), Position=UDim2.new(0,8,0,currentY),
+                BackgroundColor3=Color3.fromRGB(255,255,255),
                 BackgroundTransparency=0.1, BorderSizePixel=0, ZIndex=6,
-            }, soloList)
+            }, playerTab)
             Corner(row,UDim.new(0,5)); Stroke(row)
 
             local nameBtn = New("TextButton", {
@@ -2010,10 +2038,12 @@ RebuildSoloList = function()
                     RebuildSoloList()
                 end
             end)
-            totalHeight = totalHeight + 40
+            
+            currentY = currentY + 40
         end
     end
-    soloList.CanvasSize = UDim2.new(0,0,0,totalHeight)
+    
+    playerTab.CanvasSize = UDim2.new(0, 0, 0, currentY + 20)
 end
 
 searchSoloIn:GetPropertyChangedSignal("Text"):Connect(RebuildSoloList)
@@ -2027,43 +2057,6 @@ trackConn(Players.PlayerRemoving:Connect(function(p)
     if RebuildSoloList then RebuildSoloList() end
 end))
 RebuildSoloList()
-
-py = py + 250 -- Tạo khoảng không cho ScrollList
-Label(playerTab, "━━━━━━━━━━━━━━━━━━━━━━", py)
-py = py + 16
-
-Label(playerTab, "🔄 Chuyển máy chủ", py)
-py = py + 14
-
-local rejoinBtn = Button(playerTab, "🔄 Vào Lại Server", 8, py, 110, 24, C.BLUE)
-local serverHopBtn = Button(playerTab, "🌐 Đổi Server Khác", 126, py, 110, 24, C.PURPLE)
-
-rejoinBtn.Activated:Connect(function()
-    TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, player)
-end)
-
-serverHopBtn.Activated:Connect(function()
-    local servers = {}
-    local req = request or http_request or (syn and syn.request)
-    if req then
-        local res = req({Url = string.format("https://games.roblox.com/v1/games/%d/servers/0?sortOrder=Desc&limit=100", game.PlaceId)})
-        local body = HttpService:JSONDecode(res.Body)
-        if body and body.data then
-            for _, s in ipairs(body.data) do
-                if type(s) == "table" and s.playing < s.maxPlayers and s.id ~= game.JobId then
-                    table.insert(servers, s.id)
-                end
-            end
-        end
-    end
-    if #servers > 0 then
-        TeleportService:TeleportToPlaceInstance(game.PlaceId, servers[math.random(1, #servers)], player)
-    else
-        TeleportService:Teleport(game.PlaceId, player)
-    end
-end)
-
-playerTab.CanvasSize = UDim2.new(0, 0, 0, py + 50)
 
 -- ==================== TAB 6: MÔI TRƯỜNG ====================
 local ey = 8
@@ -2485,7 +2478,7 @@ trackConn(RunService.RenderStepped:Connect(function()
                             }, espGui)
                             local lbl = New("TextLabel", {
                                 Size = UDim2.new(1,0,1,0), BackgroundTransparency = 1, TextColor3 = Color3.fromRGB(255, 50, 50),
-                                Font = Enum.Font.GothamBold, TextSize = 11, TextStrokeTransparency = 0.2, ZIndex = 999
+                                Font=Enum.Font.GothamBold, TextSize = 11, TextStrokeTransparency = 0.2, ZIndex = 999
                             }, bb)
                             circleEspObjects[p] = {BB = bb, Lbl = lbl}
                         end
@@ -2654,4 +2647,4 @@ end))
 UpdChar()
 if S.noClip then EnNC() end
 
-print("✅ Đã cập nhật: Định Vị Lẻ đã được thêm vào Tab Người Chơi và hoạt động độc lập!")
+print("✅ Đã cập nhật: Lỗi UI đã được sửa, Định Vị Lẻ hoạt động tốt ở Tab Người Chơi!")
